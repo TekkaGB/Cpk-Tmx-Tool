@@ -67,25 +67,33 @@ namespace CpkTmxTool
             return -1;
         }
 
-        public static void replaceTmx(string cpk, string tmx)
+        private static string outputCpk;
+
+        public static void replaceTmx(string cpk, string tmx, bool overwrite)
         {
             string tmxPattern = Path.GetFileName(tmx);
             int offset = findTmx(cpk, tmxPattern);
-            string outputPath;
-            if (Path.GetDirectoryName(cpk) != null && Path.GetDirectoryName(cpk) != "")
-                outputPath = $@"{Path.GetDirectoryName(cpk)}\NEW_{Path.GetFileName(cpk)}";
-            else
-                outputPath = $@"NEW_{Path.GetFileName(cpk)}";
+            string outputPath = cpk;
+            if (!overwrite)
+            {
+                if (Path.GetDirectoryName(cpk) != null && Path.GetDirectoryName(cpk) != "")
+                    outputPath = $@"{Path.GetDirectoryName(cpk)}\NEW_{Path.GetFileName(cpk)}";
+                else
+                    outputPath = $@"NEW_{Path.GetFileName(cpk)}";
+            }
             if (OutputFilePath != null)
             {
                 if (Path.GetExtension(OutputFilePath).ToLower() != ".cpk")
+                {
                     outputPath = $@"{OutputFilePath}\{Path.GetFileName(cpk)}";
+                    Directory.CreateDirectory(OutputFilePath);
+                }
                 else
                     outputPath = OutputFilePath;
-                Directory.CreateDirectory(OutputFilePath);
             }
             if (offset > -1)
             {
+                outputCpk = outputPath;
                 byte[] tmxBytes = File.ReadAllBytes(tmx);
                 int repTmxLen = tmxBytes.Length;
                 int ogTmxLen = BitConverter.ToInt32(File.ReadAllBytes(cpk), offset + 4);
@@ -190,13 +198,18 @@ namespace CpkTmxTool
                         Console.WriteLine("[Error] Replacement file doesn't have .tmx extension");
                         return;
                     }
-                    replaceTmx(InputFilePath, ReplaceFilePath);
+                    replaceTmx(InputFilePath, ReplaceFilePath, false);
                 }
                 else
                 {
+                    int counter = 0;
                     foreach (var tmxFile in Directory.EnumerateFiles(ReplaceFilePath, "*.tmx", SearchOption.AllDirectories))
                     {
-                        replaceTmx(InputFilePath, tmxFile);
+                        if (counter == 0)
+                            replaceTmx(InputFilePath, tmxFile, false);
+                        else if (outputCpk != null)
+                            replaceTmx(outputCpk, tmxFile, true);
+                        counter += 1;
                     }
                 }
                 
@@ -280,6 +293,12 @@ namespace CpkTmxTool
             if (!File.Exists(InputFilePath) && !Directory.Exists(InputFilePath))
             {
                 Console.WriteLine($"[Error] Specified input file doesn't exist! ({InputFilePath})");
+                return false;
+            }
+
+            if (Replace && !File.Exists(ReplaceFilePath) && !Directory.Exists(ReplaceFilePath))
+            {
+                Console.WriteLine($"[Error] Specified replacement file doesn't exist! ({ReplaceFilePath})");
                 return false;
             }
 
